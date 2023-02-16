@@ -1,4 +1,5 @@
 
+
 //~
 //
 // Tetris Example (Followed OLC's tutorial and translated to c)
@@ -14,7 +15,7 @@
 #include "core/backend.h"
 #include "core/resources.h"
 
-#include "opt/render_2d.h"
+#include "render_demo.h"
 
 #include <stdlib.h>
 
@@ -27,7 +28,7 @@ i32 field_height = 18;
 u8* field;
 
 f32 xoff = 50;
-f32 yoff = 50;
+f32 yoff = 600;
 f32 block_size = 20;
 
 i32 index_with_rotate(i32 x, i32 y, i32 r) {
@@ -69,8 +70,8 @@ int main() {
 	B_BackendInit(window);
 	OS_WindowShow(window);
 	
-	R2D_Renderer renderer = {0};
-	R2D_Init(window, &renderer);
+	Renderer renderer = {0};
+	Render_Init(&renderer);
 	
 	vec4 colors[] = {
 		(vec4) {0},
@@ -183,15 +184,13 @@ int main() {
 			speed_acc = 0;
 		}
 		
-		R_Clear(BufferMask_Color);
-		
 		//if (!game_over) {
-		R2D_BeginDraw(&renderer);
+		Render_Begin_Frame(&renderer);
 		for (u32 y = 0; y < field_height; y++) {
 			for (u32 x = 0; x < field_width; x++) {
 				if (field[y * field_width + x])
-					R2D_DrawQuadC(&renderer,
-								  (rect) { xoff + x * block_size, yoff + y * block_size, block_size, block_size }, colors[field[y * field_width + x]]);
+					Render_Push_Quad_T(&renderer,
+									   (rect) { xoff + x * block_size, yoff - y * block_size, block_size, block_size }, colors[field[y * field_width + x]], Render_GetWhiteTexture());
 			}
 		}
 		
@@ -199,18 +198,18 @@ int main() {
 			for (u32 x = 0; x < 4; x++) {
 				if (tetrominos.elems[current_piece_id]
 					.str[index_with_rotate(x, y, current_rotation)] == 'X')
-					R2D_DrawQuadC(&renderer,
-								  (rect) { xoff + (current_x + x) * block_size, yoff + (current_y + y) * block_size, block_size, block_size },
-								  colors[current_piece_id + 1]);
+					Render_Push_Quad_T(&renderer,
+									   (rect) { xoff + (current_x + x) * block_size, yoff - (current_y + y) * block_size, block_size, block_size },
+									   colors[current_piece_id + 1], Render_GetWhiteTexture());
 			}
 		}
-		R2D_EndDraw(&renderer);
+		Render_End_Frame(&renderer);
 		//}
 		
 		B_BackendSwapchainNext(window);
 	}
 	
-	R2D_Free(&renderer);
+	Render_Free(&renderer);
 	
 	B_BackendFree(window);
 	OS_WindowClose(window);
