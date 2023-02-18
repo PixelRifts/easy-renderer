@@ -22,6 +22,7 @@ void Render_Init(Renderer* r) {
 	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Render_Vertex), (void*) offsetof(Render_Vertex, tex_index));
 	glEnableVertexAttribArray(3);
 	
+	// @hardcoded @resize
 	r->projection = mat4_ortho(0, 1080, 720, 0, -0.01, 1.0);
 	
 	r->shader = glCreateProgram();
@@ -149,7 +150,8 @@ void Render_Push_Triangle(Renderer* r,
 		}
 	}
 	
-	// r->texture_count < 8 confirms we don't overwrite the texture_count
+	// r->texture_count < 8 confirms we don't write more than the available
+	// texture slots
 	if (tex_index == 1248 && r->texture_count < 8) {
 		r->textures[r->texture_count] = texture;
 		tex_index = r->texture_count;
@@ -180,65 +182,6 @@ void Render_Push_Triangle(Renderer* r,
 	r->triangle_count++;
 }
 
-void Render_Push_Quad_T(Renderer* r, rect quad, vec4 tint, u32 texture) {
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y), vec2_init(quad.x + quad.w, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(0, 0), vec2_init(1, 0), vec2_init(1, 1), texture);
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y + quad.h), vec2_init(quad.x, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(0, 0), vec2_init(1, 0), vec2_init(1, 1), texture);
-}
-
-void Render_Push_Quad_ST(Renderer* r, rect quad, rect uv_quad, u32 texture, vec4 tint) {
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y),
-						 vec2_init(quad.x + quad.w, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(uv_quad.x, uv_quad.y),
-						 vec2_init(uv_quad.x + uv_quad.w, uv_quad.y), vec2_init(uv_quad.x + uv_quad.w, uv_quad.y + uv_quad.h), texture);
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y + quad.h), vec2_init(quad.x, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(uv_quad.x, uv_quad.y),
-						 vec2_init(uv_quad.x + uv_quad.w, uv_quad.y + uv_quad.h),
-						 vec2_init(uv_quad.x, uv_quad.y + uv_quad.h), texture);
-}
-
-void Render_Push_Quad_STFlipped(Renderer* r, rect quad, rect uv_quad, u32 texture, vec4 tint) {
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y),
-						 vec2_init(quad.x + quad.w, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(uv_quad.x, uv_quad.y + uv_quad.h),
-						 vec2_init(uv_quad.x + uv_quad.w, uv_quad.y + uv_quad.h), vec2_init(uv_quad.x + uv_quad.w, uv_quad.y), texture);
-	Render_Push_Triangle(r,
-						 vec2_init(quad.x, quad.y), vec2_init(quad.x + quad.w, quad.y + quad.h), vec2_init(quad.x, quad.y + quad.h),
-						 tint, tint, tint,
-						 vec2_init(uv_quad.x, uv_quad.y + uv_quad.h),
-						 vec2_init(uv_quad.x + uv_quad.w, uv_quad.y),
-						 vec2_init(uv_quad.x, uv_quad.y), texture);
-}
-
-void Render_Push_String(Renderer* r, Render_FontInfo* fontinfo, string str, vec2 pos, vec4 color) {
-	for (u32 i = 0; i < str.size; i++) {
-		if (str.str[i] >= 32 && str.str[i] < 128) {
-			stbtt_packedchar* info = &fontinfo->cdata[str.str[i] - 32];
-			rect uvs = {
-				info->x0 / 512.f, info->y0 / 512.f,
-				(info->x1 - info->x0) / 512.f, (info->y1 - info->y0) / 512.f
-			};
-			rect loc = {
-				pos.x + info->xoff, pos.y - info->yoff2,
-				info->x1 - info->x0, info->y1 - info->y0
-			};
-			Render_Push_Quad_STFlipped(r, loc, uvs, fontinfo->font_texture, color);
-			pos.x += info->xadvance;
-		}
-	}
-}
-
 //~ Helper stuff
 u32 _cached_white = 4096;
 
@@ -256,45 +199,4 @@ u32 Render_GetWhiteTexture() {
 		_cached_white = tex;
 	}
 	return _cached_white;
-}
-
-void Render_FontLoad(Render_FontInfo* fontinfo, string filename, f32 size) {
-	FILE* ttfile = fopen((char*)filename.str, "rb");
-	AssertTrue(ttfile, "Font file '%.*s' couldn't be opened", str_expand(filename));
-	fseek(ttfile, 0, SEEK_END);
-	u64 length = ftell(ttfile);
-	rewind(ttfile);
-	u8 buffer[length * sizeof(u8)];
-	fread(buffer, length, 1, ttfile);
-	fclose(ttfile);
-	
-	u8 temp_bitmap[512 * 512];
-	
-	stbtt_fontinfo finfo;
-	stbtt_pack_context packctx;
-	stbtt_InitFont(&finfo, buffer, 0);
-	stbtt_PackBegin(&packctx, temp_bitmap, 512, 512, 0, 1, 0);
-	stbtt_PackSetOversampling(&packctx, 1, 1);
-	stbtt_PackFontRange(&packctx, buffer, 0, size, 32, 95, fontinfo->cdata);
-	stbtt_PackEnd(&packctx);
-	
-	glGenTextures(1, &fontinfo->font_texture);
-	glBindTexture(GL_TEXTURE_2D, fontinfo->font_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 512, 512, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	GLint swizzles[4] = { GL_ONE, GL_ONE, GL_ONE, GL_RED };
-	glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzles);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 512, GL_RED, GL_UNSIGNED_BYTE, temp_bitmap);
-	
-	fontinfo->scale = stbtt_ScaleForPixelHeight(&finfo, size);
-	stbtt_GetFontVMetrics(&finfo, &fontinfo->ascent, &fontinfo->descent, nullptr);
-	fontinfo->baseline = (i32) (fontinfo->ascent * fontinfo->scale);
-	fontinfo->font_size = size;
-}
-
-void Render_FontFree(Render_FontInfo* fontinfo) {
-	glDeleteTextures(1, &fontinfo->font_texture);
 }

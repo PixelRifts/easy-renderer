@@ -5,7 +5,6 @@
 
 #include "base/str.h"
 #include "base/vmath.h"
-#include <stb/stb_truetype.h>
 
 #define MAX_TRIANGLES 2048
 #define MAX_VERTICES  MAX_TRIANGLES * 3
@@ -34,16 +33,6 @@ typedef struct Renderer {
 	u32 texture_count;
 } Renderer;
 
-typedef struct Render_FontInfo {
-	u32 font_texture;
-    stbtt_packedchar cdata[95];
-    f32 scale;
-    f32 font_size;
-    i32 ascent;
-    i32 descent;
-    i32 baseline;
-} Render_FontInfo;
-
 void Render_Init(Renderer* r);
 void Render_Free(Renderer* r);
 void Render_Begin_Frame(Renderer* r);
@@ -54,16 +43,7 @@ void Render_Push_Triangle(Renderer* r,
 						  vec2 a_uv, vec2 b_uv, vec2 c_uv,
 						  u32 texture);
 
-void Render_Push_Quad_T(Renderer* r, rect quad, vec4 tint, u32 texture);
-void Render_Push_Quad_ST(Renderer* r, rect quad, rect uv_quad, u32 texture, vec4 tint);
-void Render_Push_Quad_STFlipped(Renderer* r, rect quad, rect uv_quad, u32 texture, vec4 tint);
-void Render_Push_String(Renderer* r, Render_FontInfo* fontinfo, string str, vec2 pos, vec4 color);
-
 // Helpers
 u32  Render_GetWhiteTexture();
-void Render_FontLoad(Render_FontInfo* fontinfo, string filename, f32 size);
-
-void Render_FontLoad(Render_FontInfo* fontinfo, string filename, f32 size);
-void Render_FontFree(Render_FontInfo* fontinfo);
 
 #endif //RENDER_DEMO_H
